@@ -1,0 +1,204 @@
+#include "syscall.h"
+#include "copyright.h"
+
+#define MAX_LENGTH 32
+
+int main()
+{
+	// KHAI BAO
+	int check;								 // Bien co dung de kiem tra thanh cong
+	SpaceId input, output, sinhvien, result; // Bien id cho file
+	int SLTD, hold;								 // Luu so luong thoi diem xet
+	char readFile;							 // Bien ki tu luu ki tu doc tu file
+	// int flag;
+	char tmp;
+	//-----------------------------------------------------------
+
+	// Khoi tao 4 Semaphore de quan ly 3 tien trinh
+	check = CreateSemaphore("main", 0);
+	if (check == -1)
+		return 1;
+	check = CreateSemaphore("sinhvien", 0);
+	if (check == -1)
+		return 1;
+	check = CreateSemaphore("voinuoc", 0);
+	if (check == -1)
+		return 1;
+	check = CreateSemaphore("m_vn", 0);
+	if (check == -1)
+		return 1;
+
+	// Tao file output.txt de ghi ket qua cuoi cung
+	check = CreateFile("output.txt");
+	if (check == -1)
+		return 1;
+
+	// Mo file input.txt chi de doc
+	input = Open("input.txt", 1);
+	if (input == -1)
+		return 1;
+
+	// Mo file output.txt de doc va ghi
+	output = Open("output.txt", 0);
+	if (output == -1)
+	{
+		Close(input);
+		return 1;
+	}
+
+	// Doc so luong thoi diem xet o file input.txt
+	//**** Thuc hien xong doan lenh duoi thi con tro file o input.txt o dong 1
+	SLTD = 0;
+	while (1)
+	{
+		Read(&readFile, 1, input);
+		if (readFile != '\n')
+		{
+			if (readFile >= '0' && readFile <= '9')
+				SLTD = SLTD * 10 + (readFile - 48);
+		}
+		else
+			break;
+	}
+
+	// Goi thuc thi tien trinh sinhvien.c
+	check = Exec("./test/sinhvien");
+	if (check == -1)
+	{
+		Close(input);
+		Close(output);
+		return 1;
+	}
+
+	// Goi thuc thi tien trinh voinuoc.c
+	check = Exec("./test/voinuoc");
+	if (check == -1)
+	{
+		Close(input);
+		Close(output);
+		return 1;
+	}
+
+	// Thuc hien xu ly khi nao het thoi diem xet thi thoi
+	hold = SLTD;
+	while (SLTD--)
+	{
+		// Tao file sinhvien.txt
+		check = CreateFile("sinhvien.txt");
+		if (check == -1)
+		{
+			Close(input);
+			Close(output);
+			return 1;
+		}
+
+		// Mo file sinhvien.txt de ghi tung dong sinhvien tu file input.txt
+		sinhvien = Open("sinhvien.txt", 0);
+		if (sinhvien == -1)
+		{
+			Close(input);
+			Close(output);
+			return 1;
+		}
+		while (1)
+		{
+			if (Read(&readFile, 1, input) < 1)
+			{
+				// Doc toi cuoi file
+				break;
+			}
+			if (readFile != '\n')
+			{
+				Write(&readFile, 1, sinhvien);
+			}
+			else
+			{
+				break;
+			}
+		}
+		// Dong file sinhvien.txt lai
+		Close(sinhvien);
+
+		// Goi tien trinh sinhvien hoat dong
+		Signal("sinhvien");
+
+		// Tien trinh chinh phai cho
+		Wait("main");
+
+		// Thuc hien doc file tu result va ghi vao ket qua o output.txt
+		result = Open("result.txt", 1);
+		if(result == -1)
+		{
+			Close(input);
+			Close(output);
+			return 1;
+		}
+		sinhvien = Open("sinhvien.txt", 1);
+		if(sinhvien == -1)
+		{
+			if (hold < 4) // kinda tricky
+			{
+				Close(input);
+				Close(output);
+				return 1;
+			}
+			Close(input); // CANNOT DELETE
+			sinhvien = Open("sinhvien.txt",1); // reopen it again from the start to get the rest data
+			while (1)
+			{
+				if (Read(&readFile, 1, result) < 1)
+				{
+					Write("\r\n", 2, output);
+					Close(result);
+					Close(sinhvien);
+					Signal("m_vn");
+					break;
+				}
+				Read(&tmp, 2, sinhvien);
+				Write(&tmp, 1, output);
+				Write(" ", 1, output);
+				Write(&readFile, 1, output);
+				Write("  ", 2, output);
+			}
+			Close(output);
+			return 1;
+		}
+		// doc cac voi vao output.txt
+		while (1)
+		{
+			/*if (Read(&readFile, 2, sinhvien) < 1)
+			{
+				Write("\r\n", 2, output);
+				Close(result);
+				Close(sinhvien);
+				Signal("m_vn");
+				break;
+			}
+			Write(&readFile, 1, output);
+			Write(" ", 1, output);*/
+
+			if (Read(&readFile, 1, result) < 1)
+			{
+				Write("\r\n", 2, output);
+				Close(result);
+				Close(sinhvien);
+				Signal("m_vn");
+				break;
+			}
+			Read(&tmp, 2, sinhvien);
+			Write(&tmp, 1, output);
+			Write(" ", 1, output);
+			Write(&readFile, 1, output);
+			Write("  ", 2, output);
+			
+			// hmmm
+			/*Write(&readFile, 1, output);
+			Write(" ", 1, output);*/
+		}
+	}
+	//Close(sinhvien);
+	Close(input);
+	Close(output);
+	return 0;
+}
+

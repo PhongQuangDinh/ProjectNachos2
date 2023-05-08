@@ -1,0 +1,53 @@
+#include "syscall.h"
+
+int main()
+{
+    OpenFileId sinh_vien, voi_nuoc;
+    SpaceId voi_nuoc_proc;
+    char tmp;
+    int ret;
+    sinh_vien = Open("sinhvien.txt", 1);
+    if (sinh_vien == -1)
+        Exit(-1);
+    voi_nuoc_proc = Exec("./test/voinuoc");
+    if (voi_nuoc_proc == -1)
+    {
+        Close(sinh_vien);
+        Exit(-1);
+    }
+    ret = -1;
+    while (ret != 0)
+    {
+        ret = CreateFile("voinuoc.txt");
+        if (ret == -1)
+        {
+            Close(sinh_vien);
+            Exit(-1);
+        }
+        voi_nuoc = Open("voinuoc.txt", 0);
+        if (voi_nuoc == -1)
+        {
+            Close(sinh_vien);
+            Exit(-1);
+        }
+        while (1)
+        {
+            if (Read(&tmp, 1, sinh_vien) == 0)
+            {
+                Write("0", 1, voi_nuoc);
+                ret = 0;
+                break;
+            }
+            else
+                ret = -1;
+            if (tmp == ' ' || tmp == '\n')
+                break;
+            Write(&tmp, 1, voi_nuoc);
+        }
+        Close(voi_nuoc);
+        Signal("voinuoc");
+        Wait("sinhvien");
+    }
+    Exit(0);
+}
+
